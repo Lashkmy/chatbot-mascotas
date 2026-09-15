@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import os
 from dotenv import load_dotenv
+from google.api_core.exceptions import ResourceExhausted, GoogleAPICallError
 
 # 1) Cargar la API key desde el archivo .env (nunca la escribas directamente en el código)
 load_dotenv()
@@ -61,8 +62,23 @@ if user_input:
     # 8) Enviar el mensaje a Gemini y mostrar la respuesta
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
-            response = st.session_state.chat.send_message(user_input)
-            st.markdown(response.text)
+            try:
+                response = st.session_state.chat.send_message(user_input)
+                answer = response.text
+            except ResourceExhausted:
+                # Se agotó el límite gratuito de solicitudes por minuto/día
+                answer = (
+                    "🐾 En este momento he recibido demasiadas preguntas seguidas "
+                    "y alcancé el límite gratuito de uso. Por favor espera un "
+                    "minuto y vuelve a intentarlo."
+                )
+            except GoogleAPICallError:
+                # Cualquier otro error de la API (conexión, servidor, etc.)
+                answer = (
+                    "🐾 Tuve un problema para conectarme con el servicio de IA. "
+                    "Intenta de nuevo en unos segundos."
+                )
+            st.markdown(answer)
 
     # Guardar la respuesta del asistente en el historial
-    st.session_state.messages.append({"role": "assistant", "content": response.text})
+    st.session_state.messages.append({"role": "assistant", "content": answer})
